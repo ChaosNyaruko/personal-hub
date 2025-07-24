@@ -10,22 +10,23 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/sessions"
 )
 
 type submittedContent struct {
-	IsImage bool
-	Content string
+	FileType string // "text", "image", or "video"
+	Content  string
 }
 
 var (
-	mu      sync.Mutex
-	data    []string
-	tpl     *template.Template
-	store   = sessions.NewCookieStore([]byte("secret-key"))
-	users   = map[string]string{"admin": "password"}
+	mu       sync.Mutex
+	data     []string
+	tpl      *template.Template
+	store    = sessions.NewCookieStore([]byte("secret-key"))
+	users    = map[string]string{"admin": "password"}
 	dataFile = "data.txt"
 )
 
@@ -155,12 +156,11 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		data = append(data, text)
 		mu.Unlock()
-		saveData()
-		contentSlice = append(contentSlice, submittedContent{IsImage: false, Content: text})
+		contentSlice = append(contentSlice, submittedContent{FileType: "text", Content: text})
 	}
 
-	// Handle image upload
-	file, handler, err := r.FormFile("image")
+	// Handle file upload
+	file, handler, err := r.FormFile("file")
 	if err == nil {
 		defer file.Close()
 		f, err := os.OpenFile(filepath.Join("assets", handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
@@ -170,12 +170,24 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		defer f.Close()
 		io.Copy(f, file)
-		contentSlice = append(contentSlice, submittedContent{IsImage: true, Content: handler.Filename})
+
+		fileType := "image"
+		ext := strings.ToLower(filepath.Ext(handler.Filename))
+		if ext == ".mp4" || ext == ".webm" || ext == ".ogg" {
+			fileType = "video"
+		}
+
+		mu.Lock()
+		data = append(data, handler.Filename)
+		mu.Unlock()
+
+		contentSlice = append(contentSlice, submittedContent{FileType: fileType, Content: handler.Filename})
 	} else if err != http.ErrMissingFile {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	saveData()
 	session.Values["submitted_content"] = contentSlice
 	session.Save(r, w)
 
