@@ -86,7 +86,11 @@ func saveData() {
 
 func authMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, "session")
+		session, err := store.Get(r, "session")
+		if err != nil {
+			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+			return
+		}
 		if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
@@ -106,10 +110,18 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	if pass, ok := users[username]; ok {
 		if subtle.ConstantTimeCompare([]byte(password), []byte(pass)) == 1 {
-			session, _ := store.Get(r, "session")
+			session, err := store.Get(r, "session")
+			if err != nil {
+				http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+				return
+			}
 			session.Values["authenticated"] = true
 			session.Values["submitted_content"] = []submittedContent{}
-			session.Save(r, w)
+			err = session.Save(r, w)
+			if err != nil {
+				http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+				return
+			}
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -119,15 +131,27 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "session")
+	session, err := store.Get(r, "session")
+	if err != nil {
+		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		return
+	}
 	session.Values["authenticated"] = false
 	session.Values["submitted_content"] = nil
-	session.Save(r, w)
+	err = session.Save(r, w)
+	if err != nil {
+		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "session")
+	session, err := store.Get(r, "session")
+	if err != nil {
+		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		return
+	}
 	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
@@ -145,7 +169,11 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, _ := store.Get(r, "session")
+	session, err := store.Get(r, "session")
+	if err != nil {
+		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		return
+	}
 	contentSlice, ok := session.Values["submitted_content"].([]submittedContent)
 	if !ok {
 		contentSlice = []submittedContent{}
@@ -210,7 +238,11 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 
 	saveData()
 	session.Values["submitted_content"] = contentSlice
-	session.Save(r, w)
+	err = session.Save(r, w)
+	if err != nil {
+		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		return
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
