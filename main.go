@@ -27,7 +27,6 @@ var (
 	data     []string
 	tpl      *template.Template
 	store    = sessions.NewCookieStore([]byte("secret-key"))
-	users    = map[string]string{"admin": "password"}
 	dataFile = "data.txt"
 )
 
@@ -108,23 +107,30 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	if pass, ok := users[username]; ok {
-		if subtle.ConstantTimeCompare([]byte(password), []byte(pass)) == 1 {
-			session, err := store.Get(r, "session")
-			if err != nil {
-				http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
-				return
-			}
-			session.Values["authenticated"] = true
-			session.Values["submitted_content"] = []submittedContent{}
-			err = session.Save(r, w)
-			if err != nil {
-				http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
-				return
-			}
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+	adminUser := os.Getenv("MY_HUB_ADMIN_USER")
+	adminPass := os.Getenv("MY_ADMIN_PASS")
+
+	if username == "" || password == "" {
+		tpl.ExecuteTemplate(w, "login.html", "Invalid credentials")
+		return
+	}
+
+	if subtle.ConstantTimeCompare([]byte(username), []byte(adminUser)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(password), []byte(adminPass)) == 1 {
+		session, err := store.Get(r, "session")
+		if err != nil {
+			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
 			return
 		}
+		session.Values["authenticated"] = true
+		session.Values["submitted_content"] = []submittedContent{}
+		err = session.Save(r, w)
+		if err != nil {
+			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
 
 	tpl.ExecuteTemplate(w, "login.html", "Invalid credentials")

@@ -12,3 +12,8 @@ osc-raw.png
 Screen Recording 2025-04-22 at 8.37.39 PM.mov
 Screen Recording 2025-02-19 at 5.22.09 PM.mov
 Screen Recording 2025-01-07 at 11.09.40 AM.mov
+hfdf
+output.png
+""
+simultaneous
+Screen Recording 2025-02-19 at 5.22.09 PM.mov
