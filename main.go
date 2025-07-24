@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-type submittedContent struct {
+type uploadedContent struct {
 	FileType string // "text", "image", or "video"
 	Content  string
 	MimeType string
@@ -31,7 +31,7 @@ var (
 )
 
 func main() {
-	gob.Register([]submittedContent{})
+	gob.Register([]uploadedContent{})
 	tpl = template.Must(template.ParseGlob("templates/*.html"))
 
 	loadData()
@@ -40,7 +40,7 @@ func main() {
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
-	http.HandleFunc("/submit", authMiddleware(submitHandler))
+	http.HandleFunc("/upload", authMiddleware(uploadHandler))
 
 	fmt.Println("Server started at http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
@@ -123,7 +123,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		session.Values["authenticated"] = true
-		session.Values["submitted_content"] = []submittedContent{}
+		session.Values["uploaded_content"] = []uploadedContent{}
 		err = session.Save(r, w)
 		if err != nil {
 			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
@@ -143,7 +143,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.Values["authenticated"] = false
-	session.Values["submitted_content"] = nil
+	session.Values["uploaded_content"] = nil
 	err = session.Save(r, w)
 	if err != nil {
 		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
@@ -162,14 +162,14 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	contentSlice, ok := session.Values["submitted_content"].([]submittedContent)
+	contentSlice, ok := session.Values["uploaded_content"].([]uploadedContent)
 	if !ok {
-		contentSlice = []submittedContent{}
+		contentSlice = []uploadedContent{}
 	}
 	tpl.ExecuteTemplate(w, "index.html", contentSlice)
 }
 
-func submitHandler(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -180,9 +180,9 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
 		return
 	}
-	contentSlice, ok := session.Values["submitted_content"].([]submittedContent)
+	contentSlice, ok := session.Values["uploaded_content"].([]uploadedContent)
 	if !ok {
-		contentSlice = []submittedContent{}
+		contentSlice = []uploadedContent{}
 	}
 
 	// Handle text submission
@@ -191,7 +191,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		data = append(data, text)
 		mu.Unlock()
-		contentSlice = append(contentSlice, submittedContent{FileType: "text", Content: text, MimeType: ""})
+		contentSlice = append(contentSlice, uploadedContent{FileType: "text", Content: text, MimeType: ""})
 	}
 
 	// Handle file upload
@@ -236,14 +236,14 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		data = append(data, handler.Filename)
 		mu.Unlock()
 
-		contentSlice = append(contentSlice, submittedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
+		contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
 	} else if err != http.ErrMissingFile {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	saveData()
-	session.Values["submitted_content"] = contentSlice
+	session.Values["uploaded_content"] = contentSlice
 	err = session.Save(r, w)
 	if err != nil {
 		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)

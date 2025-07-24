@@ -10,15 +10,15 @@
     <main class="container">
         <hgroup>
             <h1>Simple Web App</h1>
-            <h2>Submit text, images, and videos</h2>
+            <h2>Upload text, images, and videos</h2>
         </hgroup>
-        <form action="/submit" method="post" enctype="multipart/form-data">
+        <form action="/upload" method="post" enctype="multipart/form-data">
             <textarea id="text-input" name="text" placeholder="Enter text here..."></textarea>
             <input type="file" name="file">
-            <button type="submit">Submit</button>
+            <button type="submit">Upload</button>
         </form>
         <section>
-            <h2>Submitted Content:</h2>
+            <h2>Uploaded Content:</h2>
             {{range .}}
                 <article>
                     {{if eq .FileType "image"}}
