@@ -19,6 +19,7 @@ import (
 type submittedContent struct {
 	FileType string // "text", "image", or "video"
 	Content  string
+	MimeType string
 }
 
 var (
@@ -156,7 +157,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		data = append(data, text)
 		mu.Unlock()
-		contentSlice = append(contentSlice, submittedContent{FileType: "text", Content: text})
+		contentSlice = append(contentSlice, submittedContent{FileType: "text", Content: text, MimeType: ""})
 	}
 
 	// Handle file upload
@@ -172,16 +173,36 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		io.Copy(f, file)
 
 		fileType := "image"
+		mimeType := ""
 		ext := strings.ToLower(filepath.Ext(handler.Filename))
-		if ext == ".mp4" || ext == ".webm" || ext == ".ogg" {
+		if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
 			fileType = "video"
+			switch ext {
+			case ".mp4":
+				mimeType = "video/mp4"
+			case ".webm":
+				mimeType = "video/webm"
+			case ".ogg":
+				mimeType = "video/ogg"
+			case ".mov":
+				mimeType = "video/quicktime"
+			}
+		} else {
+			switch ext {
+			case ".jpg", ".jpeg":
+				mimeType = "image/jpeg"
+			case ".png":
+				mimeType = "image/png"
+			case ".svg":
+				mimeType = "image/svg+xml"
+			}
 		}
 
 		mu.Lock()
 		data = append(data, handler.Filename)
 		mu.Unlock()
 
-		contentSlice = append(contentSlice, submittedContent{FileType: fileType, Content: handler.Filename})
+		contentSlice = append(contentSlice, submittedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
 	} else if err != http.ErrMissingFile {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

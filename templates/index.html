@@ -25,7 +25,7 @@
                         <img src="/assets/{{.Content}}" alt="uploaded image">
                     {{else if eq .FileType "video"}}
                         <video controls>
-                            <source src="/assets/{{.Content}}" type="video/mp4">
+                            <source src="/assets/{{.Content}}" type="{{.MimeType}}">
                             Your browser does not support the video tag.
                         </video>
                     {{else}}
