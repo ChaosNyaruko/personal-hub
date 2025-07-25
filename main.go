@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,14 +37,19 @@ func main() {
 
 	loadData()
 
-	http.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
-	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/logout", logoutHandler)
-	http.HandleFunc("/upload", authMiddleware(uploadHandler))
+	hub := http.NewServeMux()
 
-	fmt.Println("Server started at http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	hub.Handle("/assets/", http.StripPrefix("/hub/assets/", http.FileServer(http.Dir("assets"))))
+	hub.HandleFunc("/", indexHandler)
+	hub.HandleFunc("/login", loginHandler)
+	hub.HandleFunc("/logout", logoutHandler)
+	hub.HandleFunc("/upload", authMiddleware(uploadHandler))
+
+	http.Handle("/hub/", http.StripPrefix("/hub", hub))
+
+	if err := http.ListenAndServe(":3030", nil); err != nil {
+		log.Fatalf("Error loading data: %v", err)
+	}
 }
 
 func loadData() {
@@ -91,7 +97,7 @@ func authMiddleware(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/hub/login", http.StatusSeeOther)
 			return
 		}
 		h(w, r)
@@ -129,7 +135,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/hub/", http.StatusSeeOther)
 		return
 	}
 
@@ -149,17 +155,21 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/hub/login", http.StatusSeeOther)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	session, err := store.Get(r, "session")
 	if err != nil {
 		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
 		return
 	}
 	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/hub/login", http.StatusSeeOther)
 		return
 	}
 	contentSlice, ok := session.Values["uploaded_content"].([]uploadedContent)
@@ -171,7 +181,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/hub/", http.StatusSeeOther)
 		return
 	}
 
@@ -250,5 +260,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/hub/", http.StatusSeeOther)
 }
+
