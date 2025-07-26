@@ -1,19 +1,7 @@
-text with space
-haha
-gg bond
-haha
-
-another try
-other section
-good?
-looks fine
-Screen Recording 2025-04-22 at 8.37.39 PM.mov
-osc-raw.png
-Screen Recording 2025-04-22 at 8.37.39 PM.mov
-Screen Recording 2025-02-19 at 5.22.09 PM.mov
-Screen Recording 2025-01-07 at 11.09.40 AM.mov
-hfdf
-output.png
-""
-simultaneous
-Screen Recording 2025-02-19 at 5.22.09 PM.mov
+https://linux-hardware.org/
+https://www.ralfj.de/blog/2025/07/24/memory-safety.html
+https://www.landiannews.com/archives/109874.html
+https://github.com/ebitengine/purego
+https://m.youtube.com/watch?v=SnhcXR9CKno
+https://siraben.dev/2022/03/22/tree-sitter-linter.html
+https://blog.yossarian.net/2020/12/24/A-few-HiDPI-tricks-for-Linux
