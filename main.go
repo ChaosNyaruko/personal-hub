@@ -27,11 +27,25 @@ var (
 	mu       sync.Mutex
 	data     []string
 	tpl      *template.Template
-	store    = sessions.NewCookieStore([]byte("secret-key"))
+	store    *sessions.CookieStore
 	dataFile = "data.txt"
 )
 
+func init() {
+	// WARNING: NOT so safe, it's just for my convinence!!
+	store = sessions.NewCookieStore([]byte("secret-key"))
+	store.Options = &sessions.Options{
+		Secure: false, // make it work in LAN, when accessed by LAN addr.
+		MaxAge: 7 * 24 * 3600,
+	}
+}
+
 func main() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("get wd error: %v", err)
+	}
+	log.Printf("cwd: %v", cwd)
 	gob.Register([]uploadedContent{})
 	tpl = template.Must(template.ParseGlob("templates/*.html"))
 
@@ -47,7 +61,7 @@ func main() {
 
 	http.Handle("/hub/", http.StripPrefix("/hub", hub))
 
-	if err := http.ListenAndServe(":3030", nil); err != nil {
+	if err := http.ListenAndServe(":3000", nil); err != nil {
 		log.Fatalf("Error loading data: %v", err)
 	}
 }
@@ -262,4 +276,3 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/hub/", http.StatusSeeOther)
 }
-
