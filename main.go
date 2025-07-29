@@ -53,7 +53,7 @@ func main() {
 
 	hub := http.NewServeMux()
 
-	hub.Handle("/assets/", http.StripPrefix("/hub/assets/", http.FileServer(http.Dir("assets"))))
+	hub.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 	hub.HandleFunc("/", indexHandler)
 	hub.HandleFunc("/login", loginHandler)
 	hub.HandleFunc("/logout", logoutHandler)
@@ -107,7 +107,7 @@ func authMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "session")
 		if err != nil {
-			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+			http.Error(w, fmt.Errorf("An error occurred, please try again later %v", err).Error(), http.StatusInternalServerError)
 			return
 		}
 		if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
@@ -139,14 +139,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		subtle.ConstantTimeCompare([]byte(password), []byte(adminPass)) == 1 {
 		session, err := store.Get(r, "session")
 		if err != nil {
-			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		session.Values["authenticated"] = true
 		session.Values["uploaded_content"] = []uploadedContent{}
 		err = session.Save(r, w)
 		if err != nil {
-			http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, "/hub/", http.StatusSeeOther)
@@ -159,14 +159,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, "session")
 	if err != nil {
-		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	session.Values["authenticated"] = false
 	session.Values["uploaded_content"] = nil
 	err = session.Save(r, w)
 	if err != nil {
-		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/hub/login", http.StatusSeeOther)
@@ -179,7 +179,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := store.Get(r, "session")
 	if err != nil {
-		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
