@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
+
 
 	"github.com/gorilla/sessions"
 )
@@ -210,6 +210,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		contentSlice = []uploadedContent{}
 	}
 
+	// It's a good practice to parse the form at the beginning.
+	// This will handle both multipart and regular form data.
+	// Set a max memory limit for parsing.
+	if err := r.ParseMultipartForm(10 << 20); err != nil && err != http.ErrNotMultipart {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Handle text submission
 	text := r.FormValue("text")
 	if text != "" {
@@ -219,60 +227,61 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		contentSlice = append(contentSlice, uploadedContent{FileType: "text", Content: text, MimeType: ""})
 	}
 
-	// Handle file upload
-	file, handler, err := r.FormFile("file")
-	if err == nil {
-		defer file.Close()
-
-		uploadSource := r.FormValue("upload_source")
-		filename := handler.Filename
-		ext := strings.ToLower(filepath.Ext(handler.Filename))
-
-		if uploadSource == "paste" {
-			filename = fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-		}
-
-		f, err := os.OpenFile(filepath.Join("assets", filename), os.O_WRONLY|os.O_CREATE, 0666)
-		if err != nil {
-			http.Error(w, "Unable to create the file for writing. Check your write access privilege.", http.StatusInternalServerError)
-			return
-		}
-		defer f.Close()
-		io.Copy(f, file)
-
-		fileType := "image"
-		mimeType := ""
-		if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
-			fileType = "video"
-			switch ext {
-			case ".mp4":
-				mimeType = "video/mp4"
-			case ".webm":
-				mimeType = "video/webm"
-			case ".ogg":
-				mimeType = "video/ogg"
-			case ".mov":
-				mimeType = "video/quicktime"
+	// Handle file uploads
+	if r.MultipartForm != nil && r.MultipartForm.File != nil {
+		files := r.MultipartForm.File["file"]
+		for _, handler := range files {
+			// Make sure the file is not empty
+			if handler.Size == 0 {
+				continue
 			}
-		} else {
-			switch ext {
-			case ".jpg", ".jpeg":
-				mimeType = "image/jpeg"
-			case ".png":
-				mimeType = "image/png"
-			case ".svg":
-				mimeType = "image/svg+xml"
+			file, err := handler.Open()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
+			defer file.Close()
+
+			f, err := os.OpenFile(filepath.Join("assets", handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				http.Error(w, "Unable to create the file for writing. Check your write access privilege.", http.StatusInternalServerError)
+				return
+			}
+			defer f.Close()
+			io.Copy(f, file)
+
+			fileType := "image"
+			mimeType := ""
+			ext := strings.ToLower(filepath.Ext(handler.Filename))
+			if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
+				fileType = "video"
+				switch ext {
+				case ".mp4":
+					mimeType = "video/mp4"
+				case ".webm":
+					mimeType = "video/webm"
+				case ".ogg":
+					mimeType = "video/ogg"
+				case ".mov":
+					mimeType = "video/quicktime"
+				}
+			} else {
+				switch ext {
+				case ".jpg", ".jpeg":
+					mimeType = "image/jpeg"
+				case ".png":
+					mimeType = "image/png"
+				case ".svg":
+					mimeType = "image/svg+xml"
+				}
+			}
+
+			mu.Lock()
+			data = append(data, handler.Filename)
+			mu.Unlock()
+
+			contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
 		}
-
-		mu.Lock()
-		data = append(data, filename)
-		mu.Unlock()
-
-		contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: filename, MimeType: mimeType})
-	} else if err != http.ErrMissingFile {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	saveData()
