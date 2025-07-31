@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -222,7 +223,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, handler, err := r.FormFile("file")
 	if err == nil {
 		defer file.Close()
-		f, err := os.OpenFile(filepath.Join("assets", handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
+
+		uploadSource := r.FormValue("upload_source")
+		filename := handler.Filename
+		ext := strings.ToLower(filepath.Ext(handler.Filename))
+
+		if uploadSource == "paste" {
+			filename = fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+		}
+
+		f, err := os.OpenFile(filepath.Join("assets", filename), os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			http.Error(w, "Unable to create the file for writing. Check your write access privilege.", http.StatusInternalServerError)
 			return
@@ -232,7 +242,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		fileType := "image"
 		mimeType := ""
-		ext := strings.ToLower(filepath.Ext(handler.Filename))
 		if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
 			fileType = "video"
 			switch ext {
@@ -257,10 +266,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		mu.Lock()
-		data = append(data, handler.Filename)
+		data = append(data, filename)
 		mu.Unlock()
 
-		contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
+		contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: filename, MimeType: mimeType})
 	} else if err != http.ErrMissingFile {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

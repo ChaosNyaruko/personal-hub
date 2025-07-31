@@ -1,7 +1,0 @@
-https://linux-hardware.org/
-https://www.ralfj.de/blog/2025/07/24/memory-safety.html
-https://www.landiannews.com/archives/109874.html
-https://github.com/ebitengine/purego
-https://m.youtube.com/watch?v=SnhcXR9CKno
-https://siraben.dev/2022/03/22/tree-sitter-linter.html
-https://blog.yossarian.net/2020/12/24/A-few-HiDPI-tricks-for-Linux

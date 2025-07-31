@@ -14,7 +14,8 @@
         </hgroup>
         <form action="/hub/upload" method="post" enctype="multipart/form-data">
             <textarea id="text-input" name="text" placeholder="Enter text here..."></textarea>
-            <input type="file" name="file">
+            <input type="file" name="file" id="file-input">
+            <input type="hidden" name="upload_source" id="upload-source" value="file_chooser">
             <button type="submit">Upload</button>
         </form>
         <section>
@@ -44,6 +45,18 @@
                     textarea.select();
                 }
             }
+        });
+
+        document.addEventListener('paste', (e) => {
+            const fileInput = document.querySelector('#file-input');
+            if (e.clipboardData.files.length > 0) {
+                fileInput.files = e.clipboardData.files;
+                document.getElementById('upload-source').value = 'paste';
+            }
+        });
+
+        document.getElementById('file-input').addEventListener('change', () => {
+            document.getElementById('upload-source').value = 'file_chooser';
         });
     </script>
 </body>
