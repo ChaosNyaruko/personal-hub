@@ -12,7 +12,24 @@
             <h1>Simple Web App</h1>
             <h2>Upload text, images, and videos</h2>
         </hgroup>
+        <style>
+            .drop-zone {
+                border: 2px dashed #ccc;
+                border-radius: 8px;
+                padding: 20px;
+                text-align: center;
+                margin: 10px 0;
+                cursor: pointer;
+            }
+            .drop-zone.highlight {
+                border-color: #007bff;
+                background-color: #f0f7ff;
+            }
+        </style>
         <form action="/hub/upload" method="post" enctype="multipart/form-data">
+            <div class="drop-zone" id="drop-zone">
+                <p>Drag files here or click to upload</p>
+            </div>
             <textarea id="text-input" name="text" placeholder="Enter text here..."></textarea>
             <input type="file" name="file" id="file-input" multiple>
             <input type="hidden" name="upload_source" id="upload-source" value="file_chooser">
@@ -57,6 +74,47 @@
 
         document.getElementById('file-input').addEventListener('change', () => {
             document.getElementById('upload-source').value = 'file_chooser';
+        });
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+    
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+    
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+    
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+    
+        function highlight() {
+            dropZone.classList.add('highlight');
+        }
+    
+        function unhighlight() {
+            dropZone.classList.remove('highlight');
+        }
+    
+        dropZone.addEventListener('drop', handleDrop, false);
+    
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+            document.getElementById('upload-source').value = 'drag_drop';
+        }
+    
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
         });
     </script>
 </body>
