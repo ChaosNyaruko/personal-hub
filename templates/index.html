@@ -75,12 +75,39 @@
     </main>
     <script>
         document.addEventListener('keydown', (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-                const textarea = document.getElementById('text-input');
-                if (document.activeElement === textarea) {
-                    e.preventDefault();
-                    textarea.select();
+            const textarea = document.getElementById('text-input');
+            if (document.activeElement !== textarea) return;
+
+            if (e.ctrlKey) {
+                switch (e.key) {
+                    case 'a': // Move cursor to beginning of line
+                        e.preventDefault();
+                        const startOfLine = textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1;
+                        textarea.setSelectionRange(startOfLine, startOfLine);
+                        break;
+                    case 'e': // Move cursor to end of line
+                        e.preventDefault();
+                        const endOfLine = textarea.value.indexOf('\n', textarea.selectionStart);
+                        const endPos = endOfLine === -1 ? textarea.value.length : endOfLine;
+                        textarea.setSelectionRange(endPos, endPos);
+                        break;
+                    case 'f': // Move cursor forward one character
+                        e.preventDefault();
+                        if (textarea.selectionStart < textarea.value.length) {
+                            textarea.setSelectionRange(textarea.selectionStart + 1, textarea.selectionStart + 1);
+                        }
+                        break;
+                    case 'b': // Move cursor backward one character
+                        e.preventDefault();
+                        if (textarea.selectionStart > 0) {
+                            textarea.setSelectionRange(textarea.selectionStart - 1, textarea.selectionStart - 1);
+                        }
+                        break;
                 }
+            } else if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+                // Keep Cmd+A (Mac) or Ctrl+A (other platforms) for select all
+                e.preventDefault();
+                textarea.select();
             }
         });
 
