@@ -1,5 +1,11 @@
 # Personal Hub - Architecture Overview
 
+## Agent Co-Authors
+
+**Coco** - AI Assistant for code improvements and bug fixes
+- Co-author of memory usage optimization (removed in-memory storage, implemented append-only file operations)
+- Use `Co-authored-by: Coco <coco@example.com>` in commits when AI assistance is provided
+
 ## Project Overview
 
 Personal Hub is a simple Go web application for uploading and managing personal content including text, images, and videos. It features a clean web interface with drag-and-drop file upload capabilities, session-based authentication, and content management.
