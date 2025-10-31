@@ -12,8 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-
 
 	"github.com/gorilla/sessions"
 )
@@ -25,8 +23,6 @@ type uploadedContent struct {
 }
 
 var (
-	mu       sync.Mutex
-	data     []string
 	tpl      *template.Template
 	store    *sessions.CookieStore
 	dataFile = "data.txt"
@@ -50,8 +46,6 @@ func main() {
 	gob.Register([]uploadedContent{})
 	tpl = template.Must(template.ParseGlob("templates/*.html"))
 
-	loadData()
-
 	hub := http.NewServeMux()
 
 	hub.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
@@ -67,42 +61,6 @@ func main() {
 	}
 }
 
-func loadData() {
-	mu.Lock()
-	defer mu.Unlock()
-	file, err := os.Open(dataFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return // No data file yet, which is fine.
-		}
-		panic(err)
-	}
-	defer file.Close()
-
-	data = []string{} // Clear existing data
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		data = append(data, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-}
-
-func saveData() {
-	mu.Lock()
-	defer mu.Unlock()
-	file, err := os.Create(dataFile)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	for _, line := range data {
-		fmt.Fprintln(file, line)
-	}
-}
 
 func authMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +102,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		session.Values["authenticated"] = true
-		session.Values["uploaded_content"] = []uploadedContent{}
 		err = session.Save(r, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -164,7 +121,6 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.Values["authenticated"] = false
-	session.Values["uploaded_content"] = nil
 	err = session.Save(r, w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -187,10 +143,64 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/hub/login", http.StatusSeeOther)
 		return
 	}
-	contentSlice, ok := session.Values["uploaded_content"].([]uploadedContent)
-	if !ok {
-		contentSlice = []uploadedContent{}
+	
+	// Read content from files instead of session
+	var contentSlice []uploadedContent
+	
+	// Read text content from data.txt
+	if file, err := os.Open(dataFile); err == nil {
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			contentSlice = append(contentSlice, uploadedContent{
+				FileType: "text", 
+				Content:  scanner.Text(), 
+				MimeType: "",
+			})
+		}
 	}
+	
+	// Read files from assets directory
+	if files, err := os.ReadDir("assets"); err == nil {
+		for _, file := range files {
+			if !file.IsDir() {
+				filename := file.Name()
+				fileType := "image"
+				mimeType := ""
+				ext := strings.ToLower(filepath.Ext(filename))
+				
+				if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
+					fileType = "video"
+					switch ext {
+					case ".mp4":
+						mimeType = "video/mp4"
+					case ".webm":
+						mimeType = "video/webm"
+					case ".ogg":
+						mimeType = "video/ogg"
+					case ".mov":
+						mimeType = "video/quicktime"
+					}
+				} else {
+					switch ext {
+					case ".jpg", ".jpeg":
+						mimeType = "image/jpeg"
+					case ".png":
+						mimeType = "image/png"
+					case ".svg":
+						mimeType = "image/svg+xml"
+					}
+				}
+				
+				contentSlice = append(contentSlice, uploadedContent{
+					FileType: fileType,
+					Content:  filename,
+					MimeType: mimeType,
+				})
+			}
+		}
+	}
+	
 	tpl.ExecuteTemplate(w, "index.html", contentSlice)
 }
 
@@ -198,16 +208,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/hub/", http.StatusSeeOther)
 		return
-	}
-
-	session, err := store.Get(r, "session")
-	if err != nil {
-		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
-		return
-	}
-	contentSlice, ok := session.Values["uploaded_content"].([]uploadedContent)
-	if !ok {
-		contentSlice = []uploadedContent{}
 	}
 
 	// It's a good practice to parse the form at the beginning.
@@ -221,10 +221,18 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Handle text submission
 	text := r.FormValue("text")
 	if text != "" {
-		mu.Lock()
-		data = append(data, text)
-		mu.Unlock()
-		contentSlice = append(contentSlice, uploadedContent{FileType: "text", Content: text, MimeType: ""})
+		// Append text directly to data.txt file
+		file, err := os.OpenFile(dataFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			http.Error(w, "Unable to save text content.", http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+		
+		if _, err := fmt.Fprintln(file, text); err != nil {
+			http.Error(w, "Unable to save text content.", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Handle file uploads
@@ -249,47 +257,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer f.Close()
 			io.Copy(f, file)
-
-			fileType := "image"
-			mimeType := ""
-			ext := strings.ToLower(filepath.Ext(handler.Filename))
-			if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
-				fileType = "video"
-				switch ext {
-				case ".mp4":
-					mimeType = "video/mp4"
-				case ".webm":
-					mimeType = "video/webm"
-				case ".ogg":
-					mimeType = "video/ogg"
-				case ".mov":
-					mimeType = "video/quicktime"
-				}
-			} else {
-				switch ext {
-				case ".jpg", ".jpeg":
-					mimeType = "image/jpeg"
-				case ".png":
-					mimeType = "image/png"
-				case ".svg":
-					mimeType = "image/svg+xml"
-				}
-			}
-
-			mu.Lock()
-			data = append(data, handler.Filename)
-			mu.Unlock()
-
-			contentSlice = append(contentSlice, uploadedContent{FileType: fileType, Content: handler.Filename, MimeType: mimeType})
 		}
-	}
-
-	saveData()
-	session.Values["uploaded_content"] = contentSlice
-	err = session.Save(r, w)
-	if err != nil {
-		http.Error(w, "An error occurred, please try again later.", http.StatusInternalServerError)
-		return
 	}
 
 	http.Redirect(w, r, "/hub/", http.StatusSeeOther)
