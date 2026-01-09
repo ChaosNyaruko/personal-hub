@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/subtle"
+	"embed"
 	"encoding/gob"
 	"fmt"
 	"html/template"
@@ -30,6 +31,9 @@ type PageData struct {
 }
 
 var (
+	//go:embed templates/*.html
+	templateFS embed.FS
+
 	tpl      *template.Template
 	store    *sessions.CookieStore
 	dataFile = "data.txt"
@@ -65,7 +69,7 @@ func main() {
 	}
 	log.Printf("cwd: %v", cwd)
 	gob.Register([]uploadedContent{})
-	tpl = template.Must(template.ParseGlob("templates/*.html"))
+	tpl = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 
 	hub := http.NewServeMux()
 

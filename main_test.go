@@ -20,7 +20,7 @@ import (
 func TestMain(m *testing.M) {
 	// Setup
 	var err error
-	tpl, err = template.ParseGlob("templates/*.html")
+	tpl, err = template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		fmt.Printf("Error parsing templates: %v\n", err)
 		os.Exit(1)
