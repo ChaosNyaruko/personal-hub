@@ -18,9 +18,15 @@ import (
 )
 
 type uploadedContent struct {
-	FileType string // "text", "image", or "video"
-	Content  string
-	MimeType string
+	FileType   string // "text", "image", or "video"
+	Content    string
+	MimeType   string
+	LinkTarget string
+}
+
+type PageData struct {
+	Texts []uploadedContent
+	Media []uploadedContent
 }
 
 var (
@@ -160,7 +166,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// Read content from files instead of session
-	var contentSlice []uploadedContent
+	var pageData PageData
 	
 	// Read text content from data.txt
 	if file, err := os.Open(dataFile); err == nil {
@@ -178,7 +184,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		for i, j := 0, len(textContent)-1; i < j; i, j = i+1, j-1 {
 			textContent[i], textContent[j] = textContent[j], textContent[i]
 		}
-		contentSlice = append(contentSlice, textContent...)
+		pageData.Texts = textContent
 	}
 	
 	// Read files from assets directory
@@ -233,7 +239,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			
-			contentSlice = append(contentSlice, uploadedContent{
+			pageData.Media = append(pageData.Media, uploadedContent{
 				FileType: fileType,
 				Content:  filename,
 				MimeType: mimeType,
@@ -241,7 +247,20 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	tpl.ExecuteTemplate(w, "index.html", contentSlice)
+	// Create a map of media filenames for linking
+	mediaMap := make(map[string]bool)
+	for _, m := range pageData.Media {
+		mediaMap[m.Content] = true
+	}
+
+	// Link text to media if content matches filename
+	for i := range pageData.Texts {
+		if mediaMap[pageData.Texts[i].Content] {
+			pageData.Texts[i].LinkTarget = "/hub/assets/" + pageData.Texts[i].Content
+		}
+	}
+	
+	tpl.ExecuteTemplate(w, "index.html", pageData)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {

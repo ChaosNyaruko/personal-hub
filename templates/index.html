@@ -57,20 +57,38 @@
         </form>
         <section>
             <h2>Uploaded Content:</h2>
-            {{range .}}
-                <article>
-                    {{if eq .FileType "image"}}
-                        <img src="/hub/assets/{{.Content}}" alt="uploaded image">
-                    {{else if eq .FileType "video"}}
-                        <video controls>
-                            <source src="/hub/assets/{{.Content}}" type="{{.MimeType}}">
-                            Your browser does not support the video tag.
-                        </video>
-                    {{else}}
-                        <p>{{.Content}}</p>
+            <div class="grid">
+                <div>
+                    <h3>Texts</h3>
+                    {{range .Texts}}
+                        <article>
+                            {{if .LinkTarget}}
+                                <p><a href="{{.LinkTarget}}" target="_blank">{{.Content}}</a></p>
+                            {{else}}
+                                <p>{{.Content}}</p>
+                            {{end}}
+                        </article>
                     {{end}}
-                </article>
-            {{end}}
+                </div>
+                <div>
+                    <h3>Assets</h3>
+                    {{range .Media}}
+                        <article>
+                            {{if eq .FileType "image"}}
+                                <img src="/hub/assets/{{.Content}}" alt="uploaded image">
+                            {{else if eq .FileType "video"}}
+                                <video controls>
+                                    <source src="/hub/assets/{{.Content}}" type="{{.MimeType}}">
+                                    Your browser does not support the video tag.
+                                </video>
+                            {{end}}
+                            <footer>
+                                <small>{{.Content}}</small>
+                            </footer>
+                        </article>
+                    {{end}}
+                </div>
+            </div>
         </section>
     </main>
     <script>
