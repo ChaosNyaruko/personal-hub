@@ -31,11 +31,24 @@ var (
 )
 
 func init() {
-	// WARNING: NOT so safe, it's just for my convinence!!
-	store = sessions.NewCookieStore([]byte("secret-key"))
+	secretKey := os.Getenv("MY_HUB_SECRET_KEY")
+	if secretKey == "" {
+		log.Println("WARNING: MY_HUB_SECRET_KEY not set. Using default insecure key. Sessions will be insecure!")
+		secretKey = "secret-key"
+	}
+
+	secureCookie := false
+	if os.Getenv("MY_HUB_COOKIE_SECURE") == "true" {
+		secureCookie = true
+	}
+
+	store = sessions.NewCookieStore([]byte(secretKey))
 	store.Options = &sessions.Options{
-		Secure: false, // make it work in LAN, when accessed by LAN addr.
-		MaxAge: 7 * 24 * 3600,
+		Path:     "/",
+		Secure:   secureCookie,
+		HttpOnly: true,
+		MaxAge:   7 * 24 * 3600,
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
@@ -237,6 +250,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit upload size to 500MB
+	r.Body = http.MaxBytesReader(w, r.Body, 500<<20)
+
 	// It's a good practice to parse the form at the beginning.
 	// This will handle both multipart and regular form data.
 	// Set a max memory limit for parsing.
@@ -270,6 +286,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			if handler.Size == 0 {
 				continue
 			}
+
+			// Validate extension
+			ext := strings.ToLower(filepath.Ext(handler.Filename))
+			if !isValidExtension(ext) {
+				continue
+			}
+
 			file, err := handler.Open()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -277,7 +300,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 
-			f, err := os.OpenFile(filepath.Join(assetsDir, handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
+			// Sanitize filename
+			filename := filepath.Base(handler.Filename)
+
+			f, err := os.OpenFile(filepath.Join(assetsDir, filename), os.O_WRONLY|os.O_CREATE, 0666)
 			if err != nil {
 				http.Error(w, "Unable to create the file for writing. Check your write access privilege.", http.StatusInternalServerError)
 				return
@@ -288,4 +314,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/hub/", http.StatusSeeOther)
+}
+
+func isValidExtension(ext string) bool {
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".svg", ".mp4", ".webm", ".ogg", ".mov":
+		return true
+	}
+	return false
 }

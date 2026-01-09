@@ -176,7 +176,7 @@ func TestUploadHandler_File(t *testing.T) {
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, _ := writer.CreateFormFile("file", "test.txt")
+	part, _ := writer.CreateFormFile("file", "test.png")
 	part.Write([]byte("file content"))
 	writer.Close()
 
@@ -192,13 +192,41 @@ func TestUploadHandler_File(t *testing.T) {
 	}
 
 	// Verify file exists
-	uploadedFile := filepath.Join(testAssetsDir, "test.txt")
+	uploadedFile := filepath.Join(testAssetsDir, "test.png")
 	if _, err := os.Stat(uploadedFile); os.IsNotExist(err) {
 		t.Error("expected uploaded file to exist")
 	}
 	content, _ := os.ReadFile(uploadedFile)
 	if string(content) != "file content" {
 		t.Errorf("expected file content 'file content', got %q", string(content))
+	}
+}
+
+func TestUploadHandler_InvalidExtension(t *testing.T) {
+	tempDir, testAssetsDir := setupTestEnv(t)
+	defer os.RemoveAll(tempDir)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "malicious.exe")
+	part.Write([]byte("malicious content"))
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	w := httptest.NewRecorder()
+	uploadHandler(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("expected status %d, got %d", http.StatusSeeOther, resp.StatusCode)
+	}
+
+	// Verify file DOES NOT exist
+	uploadedFile := filepath.Join(testAssetsDir, "malicious.exe")
+	if _, err := os.Stat(uploadedFile); !os.IsNotExist(err) {
+		t.Error("expected invalid file to NOT be uploaded")
 	}
 }
 
