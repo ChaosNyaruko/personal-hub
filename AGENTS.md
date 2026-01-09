@@ -28,8 +28,14 @@ go build
 # Run the development server
 go run main.go
 
-# Run tests (no test files currently exist)
+# Run tests
 go test
+
+# Run tests with verbose output
+go test -v
+
+# Run tests and update coverage badge
+./update_coverage.sh
 ```
 
 **Server Configuration**:
@@ -53,13 +59,24 @@ go test
 
 ## Testing
 
-**Current State**: No test files exist in the codebase
+**Current State**:
+- Unit tests exist in `main_test.go` covering core handlers (`loginHandler`, `uploadHandler`, `indexHandler`) and middleware (`authMiddleware`).
+- Test coverage is tracked via badge in README.md (currently ~58%).
+- `update_coverage.sh` script available to run tests and update the coverage badge.
 
-**Recommended Testing Approach**:
-- Unit tests for core business logic
-- HTTP handler tests using `net/http/httptest`
-- Integration tests for file upload functionality
-- Session management tests
+**Testing Requirements**:
+- **Mandatory**: Every new feature or meaningful change MUST be accompanied by corresponding unit tests.
+- Existing tests must pass before merging/committing.
+- Maintain or improve the current test coverage.
+
+**Testing Strategy**:
+- `httptest` is used for testing HTTP handlers.
+- `assetsDir` variable allows swapping the storage directory during testing to prevent polluting real data.
+- Global variables (`dataFile`, `store`) are mocked/swapped in tests.
+
+**Future Testing Needs**:
+- Integration tests for full user flows.
+- Browser-based end-to-end testing.
 
 ## Security
 
