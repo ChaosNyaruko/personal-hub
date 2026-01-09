@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -26,6 +27,7 @@ var (
 	tpl      *template.Template
 	store    *sessions.CookieStore
 	dataFile = "data.txt"
+	assetsDir = "assets"
 )
 
 func init() {
@@ -48,7 +50,7 @@ func main() {
 
 	hub := http.NewServeMux()
 
-	hub.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
+	hub.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(assetsDir))))
 	hub.HandleFunc("/", indexHandler)
 	hub.HandleFunc("/login", loginHandler)
 	hub.HandleFunc("/logout", logoutHandler)
@@ -151,53 +153,78 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if file, err := os.Open(dataFile); err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
+		var textContent []uploadedContent
 		for scanner.Scan() {
-			contentSlice = append(contentSlice, uploadedContent{
+			textContent = append(textContent, uploadedContent{
 				FileType: "text", 
 				Content:  scanner.Text(), 
 				MimeType: "",
 			})
 		}
+		// Reverse text content to show newest first
+		for i, j := 0, len(textContent)-1; i < j; i, j = i+1, j-1 {
+			textContent[i], textContent[j] = textContent[j], textContent[i]
+		}
+		contentSlice = append(contentSlice, textContent...)
 	}
 	
 	// Read files from assets directory
-	if files, err := os.ReadDir("assets"); err == nil {
+	if files, err := os.ReadDir(assetsDir); err == nil {
+		type fileWithInfo struct {
+			entry os.DirEntry
+			info  os.FileInfo
+		}
+		var sortedFiles []fileWithInfo
+
 		for _, file := range files {
 			if !file.IsDir() {
-				filename := file.Name()
-				fileType := "image"
-				mimeType := ""
-				ext := strings.ToLower(filepath.Ext(filename))
-				
-				if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
-					fileType = "video"
-					switch ext {
-					case ".mp4":
-						mimeType = "video/mp4"
-					case ".webm":
-						mimeType = "video/webm"
-					case ".ogg":
-						mimeType = "video/ogg"
-					case ".mov":
-						mimeType = "video/quicktime"
-					}
-				} else {
-					switch ext {
-					case ".jpg", ".jpeg":
-						mimeType = "image/jpeg"
-					case ".png":
-						mimeType = "image/png"
-					case ".svg":
-						mimeType = "image/svg+xml"
-					}
+				info, err := file.Info()
+				if err == nil {
+					sortedFiles = append(sortedFiles, fileWithInfo{entry: file, info: info})
 				}
-				
-				contentSlice = append(contentSlice, uploadedContent{
-					FileType: fileType,
-					Content:  filename,
-					MimeType: mimeType,
-				})
 			}
+		}
+
+		// Sort by modification time descending
+		sort.Slice(sortedFiles, func(i, j int) bool {
+			return sortedFiles[i].info.ModTime().After(sortedFiles[j].info.ModTime())
+		})
+
+		for _, item := range sortedFiles {
+			file := item.entry
+			filename := file.Name()
+			fileType := "image"
+			mimeType := ""
+			ext := strings.ToLower(filepath.Ext(filename))
+			
+			if ext == ".mp4" || ext == ".webm" || ext == ".ogg" || ext == ".mov" {
+				fileType = "video"
+				switch ext {
+				case ".mp4":
+					mimeType = "video/mp4"
+				case ".webm":
+					mimeType = "video/webm"
+				case ".ogg":
+					mimeType = "video/ogg"
+				case ".mov":
+					mimeType = "video/quicktime"
+				}
+			} else {
+				switch ext {
+				case ".jpg", ".jpeg":
+					mimeType = "image/jpeg"
+				case ".png":
+					mimeType = "image/png"
+				case ".svg":
+					mimeType = "image/svg+xml"
+				}
+			}
+			
+			contentSlice = append(contentSlice, uploadedContent{
+				FileType: fileType,
+				Content:  filename,
+				MimeType: mimeType,
+			})
 		}
 	}
 	
@@ -250,7 +277,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 
-			f, err := os.OpenFile(filepath.Join("assets", handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
+			f, err := os.OpenFile(filepath.Join(assetsDir, handler.Filename), os.O_WRONLY|os.O_CREATE, 0666)
 			if err != nil {
 				http.Error(w, "Unable to create the file for writing. Check your write access privilege.", http.StatusInternalServerError)
 				return

@@ -1,5 +1,7 @@
 # A simple website that allows me to access/record random stuff without bloated note-taking systems.
 
+![Coverage](https://img.shields.io/badge/coverage-58.2%25-orange)
+
 > [!WARNING]
 > Basically **"Vibe" coded**, using many different AI tools, so not very safe, not very performant, not very reliable, not very well-documented.
 > 
